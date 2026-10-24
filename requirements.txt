@@ -2,7 +2,7 @@
 # PyTorch (CUDA) and LeRobot are installed separately — see README (they need
 # the CUDA wheel index and a git/extra install, respectively).
 
-numpy<2.0            # robosuite 1.4.x / mujoco are happiest on numpy 1.x
+numpy>=1.24          # 2.x is fine with robosuite>=1.5 / mujoco>=3.3
 scipy>=1.10
 opencv-python>=4.8
 imageio[ffmpeg]>=2.31
@@ -10,8 +10,8 @@ pyyaml>=6.0
 tqdm>=4.66
 
 # Simulation
-mujoco==3.1.6
-robosuite==1.4.1     # Franka Panda + tabletop + OSC_POSE controller built in
+mujoco>=3.3
+robosuite>=1.5       # Franka Panda + tabletop + OSC_POSE (composite controller API)
 
 # Logging / experiment tracking
 tensorboard>=2.14

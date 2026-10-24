@@ -54,6 +54,7 @@ export MUJOCO_GL=egl        # add to ~/.bashrc
 |---|---|
 | `GLFWError` / `cannot open display` | `export MUJOCO_GL=egl` (or `osmesa`). |
 | Black/empty camera frames | Try `MUJOCO_GL=osmesa`; confirm `has_offscreen_renderer=True`. |
+| `libEGL ... failed to create dri2 screen ... falling back to kms_swrast` | Non-fatal: EGL fell back to **CPU software** rendering (Mesa swrast) — frames are correct but slow. For true GPU EGL in WSL, install NVIDIA's EGL libs / libglvnd and set `__EGL_VENDOR_LIBRARY_DIRS=/usr/share/glvnd/egl_vendor.d`. Software rendering is fine for Phases 1–3; revisit only if render FPS bottlenecks training-data collection. |
 | `torch.cuda.is_available()` False | Update Windows NVIDIA driver; `wsl --shutdown` then reopen; reinstall cu121 torch. |
 | CUDA OOM during fine-tune | batch=1 → `freeze_vision=True` → image 128 → CPU inference. |
 | Slow pip / file ops | Repo on `/mnt/d` is slow; move venv + datasets to WSL-native `~/`. |

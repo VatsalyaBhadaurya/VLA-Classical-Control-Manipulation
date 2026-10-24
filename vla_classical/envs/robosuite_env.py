@@ -54,17 +54,9 @@ class ManipulationEnv:
     # -- construction -------------------------------------------------------
     def _build(self):
         import robosuite
-        from robosuite.controllers import load_controller_config
+        from robosuite import controllers as rc
 
-        cc = load_controller_config(default_controller=self.cfg.controller.controller)
-        cc["kp"] = self.cfg.controller.kp
-        cc["damping_ratio"] = self.cfg.controller.damping_ratio
-        cc["input_max"] = self.cfg.controller.input_max
-        cc["input_min"] = self.cfg.controller.input_min
-        cc["output_max"] = [self.cfg.controller.output_max_pos] * 3 + \
-                           [self.cfg.controller.output_max_rot] * 3
-        cc["output_min"] = [-self.cfg.controller.output_max_pos] * 3 + \
-                           [-self.cfg.controller.output_max_rot] * 3
+        cc = self._load_controller_config(rc)
 
         return robosuite.make(
             env_name=self.cfg.task.robosuite_env,
@@ -83,6 +75,38 @@ class ManipulationEnv:
             ignore_done=False,
             hard_reset=False,
         )
+
+    def _load_controller_config(self, rc) -> dict:
+        """Load an OSC_POSE controller config across robosuite versions.
+
+        robosuite >= 1.5 uses a *composite* controller config (a dict with a
+        top-level ``type`` and a ``body_parts`` map); the Panda default is
+        already OSC_POSE delta-pose on ``body_parts["right"]``. robosuite <= 1.4
+        uses a flat config from ``load_controller_config``.
+        """
+        c = self.cfg.controller
+        output_max = [c.output_max_pos] * 3 + [c.output_max_rot] * 3
+        output_min = [-c.output_max_pos] * 3 + [-c.output_max_rot] * 3
+
+        if hasattr(rc, "load_composite_controller_config"):          # >= 1.5
+            cc = rc.load_composite_controller_config(controller=None, robot="Panda")
+            arm = (cc.get("body_parts") or {}).get("right")
+            if arm is None or arm.get("type") != c.controller:
+                raise RuntimeError(
+                    f"Expected {c.controller} on body_parts['right'] but got "
+                    f"{None if arm is None else arm.get('type')}. "
+                    "Adjust ControllerConfig or the composite config.")
+            arm.update(kp=c.kp, damping_ratio=c.damping_ratio,
+                       input_max=c.input_max, input_min=c.input_min,
+                       output_max=output_max, output_min=output_min,
+                       input_ref_frame="world")   # world-frame deltas for scripted policy
+            return cc
+
+        cc = rc.load_controller_config(default_controller=c.controller)  # <= 1.4
+        cc.update(kp=c.kp, damping_ratio=c.damping_ratio,
+                  input_max=c.input_max, input_min=c.input_min,
+                  output_max=output_max, output_min=output_min)
+        return cc
 
     # -- API ----------------------------------------------------------------
     def reset(self) -> Observation:

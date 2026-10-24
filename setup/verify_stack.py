@@ -37,9 +37,9 @@ def check_python():
 
 
 def check_numpy():
+    # numpy 2.x is fine with robosuite >= 1.5 / mujoco >= 3.3. Only robosuite
+    # 1.4 needed numpy < 2.
     np = importlib.import_module("numpy")
-    if np.__version__.startswith("2."):
-        raise RuntimeError(f"numpy {np.__version__}; pin <2.0 for robosuite 1.4")
     return f"numpy {np.__version__}"
 
 
@@ -62,9 +62,13 @@ def check_mujoco():
 
 def check_robosuite():
     import robosuite
-    from robosuite.controllers import load_controller_config
+    from robosuite import controllers as rc
 
-    load_controller_config(default_controller="OSC_POSE")
+    if hasattr(rc, "load_composite_controller_config"):          # >= 1.5
+        cc = rc.load_composite_controller_config(controller=None, robot="Panda")
+        arm = (cc.get("body_parts") or {}).get("right", {})
+        return f"robosuite {robosuite.__version__} (composite, arm={arm.get('type')})"
+    rc.load_controller_config(default_controller="OSC_POSE")      # <= 1.4
     return f"robosuite {robosuite.__version__} (OSC_POSE ok)"
 
 
