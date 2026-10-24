@@ -74,14 +74,16 @@ class PiperMujocoEnv:
                   "cam_gripper not attached. Check piper.xml body names.")
         text = new_text
 
-        # 2) worldbody additions: light, table, object, global camera
+        # 2) worldbody additions: floor, object, global camera.
+        #    (piper.xml already defines a light; don't add another or it washes
+        #    out the wrist camera.)
+        g_xyaxes = _lookat_xyaxes(cam.cam_global_eye, cam.cam_global_target)
         extras = [
-            '<light name="top" pos="0.4 0 1.5" dir="0 0 -1" directional="false"/>',
-            f'<geom name="table" type="box" size="{_f3(sc.table_size)}" '
-            f'pos="{_f3(sc.table_pos)}" rgba="{_fN(sc.table_rgba)}" '
+            f'<geom name="floor" type="plane" size="0 0 0.05" '
+            f'pos="0 0 {sc.floor_z}" rgba="{_fN(sc.floor_rgba)}" '
             f'friction="1 0.05 0.001"/>',
-            f'<camera name="cam_global" mode="fixed" pos="{_f3(cam.cam_global_pos)}" '
-            f'xyaxes="{_fN(cam.cam_global_xyaxes)}" fovy="{cam.cam_global_fovy}"/>',
+            f'<camera name="cam_global" mode="fixed" pos="{_f3(cam.cam_global_eye)}" '
+            f'xyaxes="{_fN(g_xyaxes)}" fovy="{cam.cam_global_fovy}"/>',
         ]
         if sc.add_object:
             extras.append(
@@ -202,3 +204,18 @@ def _f3(v) -> str:
 
 def _fN(v) -> str:
     return " ".join(f"{x:.6g}" for x in v)
+
+
+def _lookat_xyaxes(eye, target, world_up=(0, 0, 1)):
+    """MJCF camera xyaxes (right, up) so the camera at `eye` looks at `target`.
+
+    MuJoCo cameras view along their local -z; +x is right, +y is up.
+    """
+    eye = np.asarray(eye, float)
+    fwd = np.asarray(target, float) - eye
+    fwd /= (np.linalg.norm(fwd) + 1e-9)
+    up = np.asarray(world_up, float)
+    right = np.cross(fwd, up)
+    right /= (np.linalg.norm(right) + 1e-9)
+    true_up = np.cross(right, fwd)
+    return (*right, *true_up)

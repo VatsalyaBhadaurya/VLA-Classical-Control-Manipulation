@@ -24,22 +24,23 @@ class PiperCameraConfig:
     cam_gripper_hw: tuple[int, int] = (480, 640)
     # Downsample factor for faster CPU (swrast) rendering / VLA input. 1 = full.
     render_downsample: int = 1
-    # Initial camera extrinsics (TUNE against a real dataset frame).
-    # cam_global lives in the world; cam_gripper is attached to link6 (wrist).
-    cam_global_pos: tuple[float, float, float] = (1.10, 0.0, 0.70)
-    cam_global_xyaxes: tuple[float, ...] = (0, 1, 0, 0, 0, 1)   # front view, +z up
-    cam_global_fovy: float = 45.0
-    cam_gripper_pos: tuple[float, float, float] = (0.05, 0.0, 0.0)
-    cam_gripper_xyaxes: tuple[float, ...] = (0, -1, 0, 0, 0, 1)
-    cam_gripper_fovy: float = 60.0
+    # cam_global: fixed world camera defined by an eye->target look-at (intuitive
+    # to tune). TUNE eye/target against a real dataset frame.
+    cam_global_eye: tuple[float, float, float] = (0.90, -0.55, 0.55)
+    cam_global_target: tuple[float, float, float] = (0.33, 0.0, 0.10)
+    cam_global_fovy: float = 50.0
+    # cam_gripper: attached to link6 (wrist). The tool/fingers extend along
+    # link6 local +z, so the camera looks along +z (xyaxes below give that).
+    cam_gripper_pos: tuple[float, float, float] = (0.0, 0.06, -0.02)
+    cam_gripper_xyaxes: tuple[float, ...] = (1, 0, 0, 0, -1, 0)  # view dir = link6 +z
+    cam_gripper_fovy: float = 70.0
 
 
 @dataclass
 class PiperSceneConfig:
-    # Static table (box). Top surface at z=0 so the arm base sits on it.
-    table_size: tuple[float, float, float] = (0.35, 0.50, 0.02)
-    table_pos: tuple[float, float, float] = (0.35, 0.0, -0.02)
-    table_rgba: tuple[float, float, float, float] = (0.72, 0.60, 0.45, 1.0)
+    # Ground plane = work surface; arm base sits at z=0 (gravcomp'd, no push).
+    floor_z: float = 0.0
+    floor_rgba: tuple[float, float, float, float] = (0.35, 0.38, 0.42, 1.0)
     # Placeholder manipulation object — REPLACE once the real task is known.
     add_object: bool = True
     object_size: tuple[float, float, float] = (0.02, 0.02, 0.02)
