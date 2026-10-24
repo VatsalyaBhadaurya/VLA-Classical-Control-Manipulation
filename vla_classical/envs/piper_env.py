@@ -109,6 +109,8 @@ class PiperMujocoEnv:
              for j in ARM_JOINTS])
         g7 = mj.mj_name2id(m, mj.mjtObj.mjOBJ_JOINT, "joint7")
         self._grip_qadr = m.jnt_qposadr[g7]
+        g8 = mj.mj_name2id(m, mj.mjtObj.mjOBJ_JOINT, "joint8")
+        self._grip8_qadr = m.jnt_qposadr[g8] if g8 >= 0 else None
         # qvel addresses (arm)
         self._arm_vadr = np.array(
             [m.jnt_dofadr[mj.mj_name2id(m, mj.mjtObj.mjOBJ_JOINT, j)]
@@ -175,6 +177,21 @@ class PiperMujocoEnv:
     def state_vector(self) -> np.ndarray:
         """Dataset-order [j1..j6, gripper] (7,)."""
         return self.get_observation().raw["state"]
+
+    def set_state(self, state7: np.ndarray) -> Observation:
+        """Hard-set the arm+gripper to a dataset state (kinematic replay).
+
+        Bypasses dynamics/controller — used to perfectly reproduce recorded
+        trajectories visually. Also sets the mirrored finger (joint8).
+        """
+        s = np.asarray(state7, dtype=np.float64).ravel()
+        self.data.qpos[self._arm_qadr] = s[:6]
+        g = self._grip_ds_to_ctrl(s[6])
+        self.data.qpos[self._grip_qadr] = g
+        if self._grip8_qadr is not None:
+            self.data.qpos[self._grip8_qadr] = -g
+        self.mj.mj_forward(self.model, self.data)
+        return self.get_observation()
 
     # ---------------------------------------------------------------- render
     def render(self, camera: str) -> np.ndarray:
