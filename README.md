@@ -89,29 +89,39 @@ python scripts/evaluate.py --task lift --policy smolvla --safety --randomize
 
 ## PiPER dataset track (`aiengineer56/piper_dataset_1100`)
 
-A second, dataset-matched track targeting the **AgileX PiPER** (6-DoF + gripper,
-LeRobot **v3.0** dataset). The sim env reproduces the dataset's I/O exactly:
-`action`/`observation.state` = `[joint1..joint6, gripper]` (absolute joint
-targets, radians + 0–0.1 m gripper), cameras `cam_global` (1280×720) and
-`cam_gripper` (640×480) @ 30 fps. Control is **joint-space position** (no OSC/IK).
+Dataset-matched track targeting the **AgileX PiPER** (6-DoF + gripper, LeRobot
+**v3.0**, 1116 episodes @ 30 fps). Task: **"pick the yellow block put into the
+box"** (variants: black block; pick only). The sim env reproduces the dataset
+I/O exactly:
+
+- `action` / `observation.state` = `[joint1..joint6, gripper]` — **absolute
+  joint-position targets** (radians + 0–0.1 m gripper). Control is joint-space
+  position (no OSC/IK).
+- cameras `cam_global` (1280×720) + `cam_gripper` (640×480, on `link6`).
+- scene: white table, yellow + black cubes, open-top cardboard box.
+
+All PiPER config (joint limits, gripper units, camera extrinsics, object poses,
+rest pose, instruction) lives in `configs/piper.py`.
 
 ```bash
 # 1) Vendor the PiPER model from MuJoCo Menagerie (sparse checkout)
 bash setup/fetch_piper.sh
 
-# 2) Build the scene, render both cameras, verify joint-space control
-#    (720p software render is slow — use --downsample 2 or 3 to iterate fast)
+# 2) Build the scene, render both cameras, verify joint-space control.
+#    (720p software render is slow — use --downsample 2/3 to iterate fast)
 python scripts/piper_render_test.py --out out/piper --downsample 2
 
-# 3) Pull dataset metadata (task text + stats); episodes stream via LeRobot
-hf download aiengineer56/piper_dataset_1100 --repo-type dataset \
-    --include "meta/*" --local-dir data/piper_dataset_1100
+# 3) Inspect the dataset: print tasks/schema + dump REAL camera frames
+python scripts/peek_dataset.py --episode 0
+
+# 4) Replay a recorded episode in the sim (kinematic = faithful reproduction)
+python scripts/replay_dataset.py --episode 0 --mode kinematic --out out/replay.mp4
+#   --mode actuated  feeds recorded actions through the joint controller + physics
 ```
 
-Open `out/piper_cam_global.png` / `out/piper_cam_gripper.png` to check the view;
-camera extrinsics in `configs/piper.py` are initial guesses to be tuned against a
-real dataset frame. The task's scene objects are a placeholder cube until the
-task instruction is read from the dataset metadata.
+> Object *poses* aren't in the dataset (only joint data), so cube/box positions
+> are plausible reachable placements (to be randomized for training), not a
+> pixel-match of any single real frame.
 
 ## Hardware / feasibility notes (RTX 4050, 6 GB)
 
