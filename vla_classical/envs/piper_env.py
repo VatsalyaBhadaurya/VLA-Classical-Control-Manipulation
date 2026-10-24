@@ -139,8 +139,17 @@ class PiperMujocoEnv:
 
     # --------------------------------------------------------------------- API
     def reset(self) -> Observation:
-        self.mj.mj_resetDataKeyframe(self.model, self.data, 0)  # "home"
-        self.mj.mj_forward(self.model, self.data)
+        mj = self.mj
+        # mj_resetData -> qpos0: free objects (cubes) at their DEFINED poses.
+        # (Resetting to the 'home' keyframe would zero-pad the cube free-joints
+        #  to the origin, since the keyframe only specifies the 8 arm/finger qpos.)
+        mj.mj_resetData(self.model, self.data)
+        if self.model.nkey > 0:                     # apply the home ARM pose only
+            kq = self.model.key_qpos[0]
+            self.data.qpos[self._arm_qadr] = kq[:6]
+            self.data.qpos[self._grip_qadr] = kq[6]
+            self.data.ctrl[:] = self.model.key_ctrl[0]
+        mj.mj_forward(self.model, self.data)
         return self.get_observation()
 
     def step(self, action: np.ndarray) -> Observation:

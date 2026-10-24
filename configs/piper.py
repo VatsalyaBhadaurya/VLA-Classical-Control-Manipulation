@@ -26,10 +26,10 @@ class PiperCameraConfig:
     render_downsample: int = 1
     # cam_global: fixed world camera defined by an eye->target look-at (intuitive
     # to tune). TUNE eye/target against a real dataset frame.
-    # Behind-left, elevated, looking across the workspace (like the real rig,
-    # which sits behind the arm looking toward the operator). TUNE to taste.
-    cam_global_eye: tuple[float, float, float] = (-0.25, -0.45, 0.50)
-    cam_global_target: tuple[float, float, float] = (0.30, 0.0, 0.05)
+    # Elevated 3/4 view centered on the workspace (box + cubes in front of the
+    # arm), like the real rig's angled top-down frame. TUNE to taste.
+    cam_global_eye: tuple[float, float, float] = (0.05, -0.45, 0.60)
+    cam_global_target: tuple[float, float, float] = (0.30, 0.0, 0.02)
     cam_global_fovy: float = 55.0
     # cam_gripper: attached to link6 (wrist). The tool/fingers extend along
     # link6 local +z, so the camera looks along +z (xyaxes below give that).
