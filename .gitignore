@@ -9,4 +9,6 @@ wandb/
 *.ckpt
 data/
 !vla_classical/data/
+third_party/
+*_autogen.xml
 .DS_Store
