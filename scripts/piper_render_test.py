@@ -34,21 +34,18 @@ def main():
     print(f"[model] nq={env.model.nq} nu={env.model.nu} "
           f"timestep={env.model.opt.timestep} n_substeps={env.n_substeps}")
 
-    obs = env.reset()
+    env.reset()
+    # start in the real robot's resting configuration (dataset ep0 row0)
+    obs = env.set_state(np.array(cfg.rest_state))
     s = env.state_vector()
-    print(f"[home] state[7]={np.round(s, 3)}")
+    print(f"[rest] state[7]={np.round(s, 3)}")
+    print(f"[rest] eef(link6) world pos={np.round(obs.eef_pos, 3)}  "
+          f"(anchor object positions near here)")
+    if obs.object_pose is not None:
+        print(f"[obj ] yellow_block pos={np.round(obs.object_pose[:3], 3)}")
     for name, img in obs.images.items():
         print(f"[img] {name}: shape={img.shape} dtype={img.dtype} "
               f"nonzero={bool(img.any())}")
-
-    # confirm joint-space control actually moves the arm: nudge joint1 + close grip
-    target = s.copy()
-    target[0] += 0.4          # rotate base joint
-    target[6] = 0.0           # close gripper (dataset units)
-    for _ in range(30):       # 1 second at 30 Hz
-        obs = env.step(target)
-    s2 = env.state_vector()
-    print(f"[moved] state[7]={np.round(s2, 3)}  (dj1={s2[0]-s[0]:+.3f})")
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     import imageio

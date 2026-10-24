@@ -26,9 +26,11 @@ class PiperCameraConfig:
     render_downsample: int = 1
     # cam_global: fixed world camera defined by an eye->target look-at (intuitive
     # to tune). TUNE eye/target against a real dataset frame.
-    cam_global_eye: tuple[float, float, float] = (0.90, -0.55, 0.55)
-    cam_global_target: tuple[float, float, float] = (0.33, 0.0, 0.10)
-    cam_global_fovy: float = 50.0
+    # Behind-left, elevated, looking across the workspace (like the real rig,
+    # which sits behind the arm looking toward the operator). TUNE to taste.
+    cam_global_eye: tuple[float, float, float] = (-0.25, -0.45, 0.50)
+    cam_global_target: tuple[float, float, float] = (0.30, 0.0, 0.05)
+    cam_global_fovy: float = 55.0
     # cam_gripper: attached to link6 (wrist). The tool/fingers extend along
     # link6 local +z, so the camera looks along +z (xyaxes below give that).
     cam_gripper_pos: tuple[float, float, float] = (0.0, 0.06, -0.02)
@@ -37,16 +39,43 @@ class PiperCameraConfig:
 
 
 @dataclass
+class CubeSpec:
+    name: str
+    pos: tuple[float, float, float]
+    rgba: tuple[float, float, float, float]
+    half: float = 0.0125                     # ~2.5 cm cube
+    mass: float = 0.03
+
+
+@dataclass
+class BoxSpec:
+    """Open-top cardboard receptacle (static), built from 5 thin boxes."""
+    name: str = "bin"
+    pos: tuple[float, float, float] = (0.28, 0.20, 0.0)   # floor corner of the box
+    inner_half: tuple[float, float] = (0.06, 0.05)        # inner half-extents (x, y)
+    height: float = 0.05
+    wall: float = 0.006
+    rgba: tuple[float, float, float, float] = (0.76, 0.60, 0.40, 1.0)
+
+
+@dataclass
 class PiperSceneConfig:
     # Ground plane = work surface; arm base sits at z=0 (gravcomp'd, no push).
+    # Real rig is a white tabletop.
     floor_z: float = 0.0
-    floor_rgba: tuple[float, float, float, float] = (0.35, 0.38, 0.42, 1.0)
-    # Placeholder manipulation object — REPLACE once the real task is known.
-    add_object: bool = True
-    object_size: tuple[float, float, float] = (0.02, 0.02, 0.02)
-    object_pos: tuple[float, float, float] = (0.42, 0.0, 0.02)
-    object_rgba: tuple[float, float, float, float] = (0.85, 0.1, 0.1, 1.0)
-    object_mass: float = 0.05
+    floor_rgba: tuple[float, float, float, float] = (0.86, 0.86, 0.88, 1.0)
+    # Task objects: yellow + black blocks and a box (see task instructions).
+    # NOTE: real object poses aren't in the dataset — these are plausible
+    # reachable placements, to be randomized for training.
+    add_objects: bool = True
+    cubes: list = field(default_factory=lambda: [
+        CubeSpec("yellow_block", (0.32, -0.12, 0.0125), (0.95, 0.80, 0.10, 1.0)),
+        CubeSpec("black_block", (0.32, 0.02, 0.0125), (0.08, 0.08, 0.08, 1.0)),
+    ])
+    box: BoxSpec = field(default_factory=BoxSpec)
+    # Even overhead lighting to approximate the bright indoor rig.
+    headlight_ambient: tuple[float, float, float] = (0.4, 0.4, 0.4)
+    headlight_diffuse: tuple[float, float, float] = (0.5, 0.5, 0.5)
 
 
 @dataclass
@@ -68,9 +97,15 @@ class PiperConfig:
     camera: PiperCameraConfig = field(default_factory=PiperCameraConfig)
     scene: PiperSceneConfig = field(default_factory=PiperSceneConfig)
 
+    # Real resting configuration (from dataset episode 0, row 0) — use instead
+    # of the Menagerie "home" keyframe so the sim starts like the real robot.
+    rest_state: tuple[float, ...] = (0.012, 0.004, -0.018, 0.052, 0.499, -0.135, 0.0)
+
     # Data
     dataset_repo_id: str = "aiengineer56/piper_dataset_1100"
-    instruction: str = ""   # filled from the dataset's task metadata once known
+    # Task instruction (from dataset meta/tasks). Variants also include
+    # "pick the black block put into the box" / "pick the yellow block".
+    instruction: str = "pick the yellow block put into the box"
 
 
 def make_piper_config() -> PiperConfig:

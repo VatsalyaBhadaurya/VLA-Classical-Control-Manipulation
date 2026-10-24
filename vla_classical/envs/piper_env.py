@@ -74,9 +74,14 @@ class PiperMujocoEnv:
                   "cam_gripper not attached. Check piper.xml body names.")
         text = new_text
 
-        # 2) worldbody additions: floor, object, global camera.
-        #    (piper.xml already defines a light; don't add another or it washes
-        #    out the wrist camera.)
+        # 1b) even overhead lighting (piper.xml has no <visual>/headlight; its
+        #     only light tracks the gripper, leaving the table dark).
+        headlight = (
+            f'<visual><headlight ambient="{_fN(sc.headlight_ambient)}" '
+            f'diffuse="{_fN(sc.headlight_diffuse)}" specular="0 0 0"/></visual>')
+        text = text.replace("<worldbody>", f"{headlight}\n  <worldbody>", 1)
+
+        # 2) worldbody additions: floor, global camera, task objects (box + cubes).
         g_xyaxes = _lookat_xyaxes(cam.cam_global_eye, cam.cam_global_target)
         extras = [
             f'<geom name="floor" type="plane" size="0 0 0.05" '
@@ -85,13 +90,9 @@ class PiperMujocoEnv:
             f'<camera name="cam_global" mode="fixed" pos="{_f3(cam.cam_global_eye)}" '
             f'xyaxes="{_fN(g_xyaxes)}" fovy="{cam.cam_global_fovy}"/>',
         ]
-        if sc.add_object:
-            extras.append(
-                f'<body name="object" pos="{_f3(sc.object_pos)}">'
-                f'<freejoint name="object_free"/>'
-                f'<geom name="object" type="box" size="{_f3(sc.object_size)}" '
-                f'rgba="{_fN(sc.object_rgba)}" mass="{sc.object_mass}" '
-                f'friction="1 0.05 0.001"/></body>')
+        if sc.add_objects:
+            extras.append(_box_xml(sc.box))
+            extras.extend(_cube_xml(c) for c in sc.cubes)
         block = "\n      ".join(extras)
         text = text.replace("</worldbody>", f"      {block}\n    </worldbody>", 1)
 
@@ -122,7 +123,10 @@ class PiperMujocoEnv:
         if np.any(self._act_ids < 0):
             raise RuntimeError("Missing an expected actuator (joint1..6/gripper).")
         self._wrist_bid = mj.mj_name2id(m, mj.mjtObj.mjOBJ_BODY, WRIST_BODY)
-        self._obj_bid = mj.mj_name2id(m, mj.mjtObj.mjOBJ_BODY, "object")
+        # track the primary task object (yellow block) as object_pose, if present
+        cubes = getattr(self.cfg.scene, "cubes", [])
+        primary = cubes[0].name if cubes else "object"
+        self._obj_bid = mj.mj_name2id(m, mj.mjtObj.mjOBJ_BODY, primary)
 
     # ------------------------------------------------------------------- units
     def _grip_ds_to_ctrl(self, g: float) -> float:
@@ -221,6 +225,33 @@ def _f3(v) -> str:
 
 def _fN(v) -> str:
     return " ".join(f"{x:.6g}" for x in v)
+
+
+def _cube_xml(c) -> str:
+    return (f'<body name="{c.name}" pos="{_f3(c.pos)}">'
+            f'<freejoint name="{c.name}_free"/>'
+            f'<geom name="{c.name}" type="box" size="{c.half} {c.half} {c.half}" '
+            f'rgba="{_fN(c.rgba)}" mass="{c.mass}" friction="1 0.05 0.001"/></body>')
+
+
+def _box_xml(b) -> str:
+    """Open-top receptacle (static body) from a base + 4 walls."""
+    ihx, ihy = b.inner_half
+    w, h = b.wall, b.height
+    ox = ihx + w          # outer half-extent x
+    oy = ihy + w          # outer half-extent y
+    g = [f'<geom name="{b.name}_base" type="box" size="{ox} {oy} {w}" '
+         f'pos="0 0 {w}" rgba="{_fN(b.rgba)}"/>']
+    specs = [       # (name, size x/y/z, pos x/y/z) for the 4 walls
+        (f"{b.name}_px", (w, oy, h / 2), (ox, 0, h / 2)),
+        (f"{b.name}_nx", (w, oy, h / 2), (-ox, 0, h / 2)),
+        (f"{b.name}_py", (ox, w, h / 2), (0, oy, h / 2)),
+        (f"{b.name}_ny", (ox, w, h / 2), (0, -oy, h / 2)),
+    ]
+    for name, size, pos in specs:
+        g.append(f'<geom name="{name}" type="box" size="{_f3(size)}" '
+                 f'pos="{_f3(pos)}" rgba="{_fN(b.rgba)}"/>')
+    return f'<body name="{b.name}" pos="{_f3(b.pos)}">' + "".join(g) + "</body>"
 
 
 def _lookat_xyaxes(eye, target, world_up=(0, 0, 1)):
