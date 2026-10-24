@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+out/
+runs/
+wandb/
+*.mp4
+*.pth
+*.ckpt
+data/
+!vla_classical/data/
+.DS_Store
