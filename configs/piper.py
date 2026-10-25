@@ -79,6 +79,17 @@ class PiperSceneConfig:
 
 
 @dataclass
+class JointSafetyConfig:
+    """Classical safety layer for joint-space absolute targets (the 'HOW')."""
+    enabled: bool = True
+    max_joint_step: float = 0.05       # rad per control step (30Hz -> 1.5 rad/s)
+    max_gripper_step: float = 0.02     # m per control step
+    lowpass_alpha: float = 0.6         # EMA smoothing on the target (1=no smoothing)
+    max_joint_vel: float = 3.0         # rad/s; E-stop if measured vel exceeds
+    estop_on_nan: bool = True
+
+
+@dataclass
 class PiperConfig:
     # Where the vendored Menagerie model lives (see setup/fetch_piper.sh).
     menagerie_dir: str = "third_party/mujoco_menagerie/agilex_piper"
@@ -96,6 +107,13 @@ class PiperConfig:
 
     camera: PiperCameraConfig = field(default_factory=PiperCameraConfig)
     scene: PiperSceneConfig = field(default_factory=PiperSceneConfig)
+    safety: JointSafetyConfig = field(default_factory=JointSafetyConfig)
+
+    # SmolVLA inference (after fine-tuning). Point at the checkpoint's
+    # pretrained_model dir produced by lerobot-train.
+    vla_ckpt: str = "outputs/train/piper_smolvla/checkpoints/last/pretrained_model"
+    vla_device: str = "cuda"           # "cpu" fallback if VRAM insufficient
+    vla_half: bool = False             # fp16 weights to save VRAM (try if OOM)
 
     # Real resting configuration (from dataset episode 0, row 0) — use instead
     # of the Menagerie "home" keyframe so the sim starts like the real robot.

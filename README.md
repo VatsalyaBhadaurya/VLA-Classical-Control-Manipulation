@@ -123,6 +123,27 @@ python scripts/replay_dataset.py --episode 0 --mode kinematic --out out/replay.m
 > are plausible reachable placements (to be randomized for training), not a
 > pixel-match of any single real frame.
 
+### SmolVLA integration (fine-tune → hybrid rollout)
+
+```bash
+# Fine-tune SmolVLA-450M on the dataset (joint-space actions).
+#   6 GB caveat: training a 450M VLA barely fits — prefer a cloud GPU for
+#   training and run INFERENCE locally (inference fits 6 GB). See the script.
+bash scripts/finetune_piper.sh
+
+# Hybrid rollout in the sim: SmolVLA -> JointSafetyFilter -> PiperMujocoEnv
+python scripts/run_piper_vla.py --steps 300 \
+    --ckpt outputs/train/piper_smolvla/checkpoints/last/pretrained_model \
+    --out out/piper_vla.mp4
+#   --no-safety  runs VLA-only (no classical filter) for the ablation
+```
+
+The hybrid path mirrors the architecture: SmolVLA outputs a `[j1..j6, gripper]`
+chunk → `JointSafetyFilter` (limit clamp, per-step rate limit, EMA smoothing,
+over-speed/NaN E-stop) → joint-position actuators. Loading uses lerobot 0.6.x:
+`PreTrainedConfig.from_pretrained` + `make_policy` + `make_pre_post_processors`
+(the processor pipeline handles normalization + language tokenization).
+
 ## Hardware / feasibility notes (RTX 4050, 6 GB)
 
 - **SmolVLA-450M** fp16 ≈ ~1 GB weights; inference fits comfortably. Fine-tuning
