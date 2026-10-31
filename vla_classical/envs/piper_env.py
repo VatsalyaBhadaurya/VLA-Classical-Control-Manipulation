@@ -161,7 +161,7 @@ class PiperMujocoEnv:
         mj.mj_forward(self.model, self.data)
         return self.get_observation()
 
-    def step(self, action: np.ndarray) -> Observation:
+    def step(self, action: np.ndarray, render: bool = True) -> Observation:
         """action = [j1..j6, gripper] absolute targets (dataset units)."""
         a = np.asarray(action, dtype=np.float64).ravel()
         assert a.shape[0] == 7, f"expected 7-dim action, got {a.shape[0]}"
@@ -172,14 +172,15 @@ class PiperMujocoEnv:
         self.data.ctrl[self._act_ids] = ctrl
         for _ in range(self.n_substeps):
             self.mj.mj_step(self.model, self.data)
-        return self.get_observation()
+        return self.get_observation(render=render)
 
-    def get_observation(self) -> Observation:
+    def get_observation(self, render: bool = True) -> Observation:
         qpos = self.data.qpos
         arm_q = qpos[self._arm_qadr].astype(np.float32)
         grip_ds = self._grip_ctrl_to_ds(float(qpos[self._grip_qadr]))
         state = np.concatenate([arm_q, [grip_ds]]).astype(np.float32)  # dataset [7]
-        images = {name: self.render(name) for name in ("cam_global", "cam_gripper")}
+        images = ({name: self.render(name) for name in ("cam_global", "cam_gripper")}
+                  if render else {})
         obj_pose = None
         if self._obj_bid >= 0:
             obj_pose = np.concatenate([self.data.xpos[self._obj_bid],
