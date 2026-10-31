@@ -229,6 +229,11 @@ class PiperMujocoEnv:
         r.update_scene(self.data, camera=camera)
         return np.ascontiguousarray(r.render().astype(np.uint8))
 
+    @property
+    def joint_vel(self) -> np.ndarray:
+        """Arm joint velocities (rad/s) — used by the safety E-stop."""
+        return self.data.qvel[self._arm_vadr].astype(np.float64)
+
     # ------------------------------------------------- perception / geometry
     def geom_id(self, name: str) -> int:
         return self.mj.mj_name2id(self.model, self.mj.mjtObj.mjOBJ_GEOM, name)

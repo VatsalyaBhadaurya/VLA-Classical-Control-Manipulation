@@ -11,6 +11,7 @@ waypoints into the joint targets the env consumes.
 from __future__ import annotations
 
 import numpy as np
+from scipy.spatial.transform import Rotation as _Rot
 
 
 class DifferentialIK:
@@ -49,10 +50,10 @@ class DifferentialIK:
             cur_mat = data.site_xmat[self.sid].reshape(3, 3)
 
             e_pos = target_pos - cur_pos
-            # orientation error: sum of column-axis cross products (R_cur -> R_tgt)
-            e_rot = 0.5 * (np.cross(cur_mat[:, 0], target_mat[:, 0])
-                           + np.cross(cur_mat[:, 1], target_mat[:, 1])
-                           + np.cross(cur_mat[:, 2], target_mat[:, 2]))
+            # orientation error as a world-frame rotation vector (axis*angle).
+            # Via R_err = R_tgt @ R_cur^T -> rotvec; correct even for ~180° flips
+            # (the cross-product form is degenerate there and stalls the solver).
+            e_rot = _Rot.from_matrix(target_mat @ cur_mat.T).as_rotvec()
             err = np.concatenate([e_pos, e_rot])
             err_norm = float(np.linalg.norm(err))
             if np.linalg.norm(e_pos) < pos_tol and np.linalg.norm(e_rot) < rot_tol:
