@@ -29,47 +29,59 @@ class DifferentialIK:
         self.high = np.asarray(env.cfg.joint_high)
 
     def solve(self, target_pos, target_mat, q_init=None,
-              iters: int = 200, pos_tol: float = 2e-3, rot_tol: float = 2e-2,
-              damping: float = 5e-2, step: float = 0.5):
-        mj, model, data = self.mj, self.model, self.data
-        saved = data.qpos.copy()
-        savedv = data.qvel.copy()
-
-        if q_init is not None:
-            data.qpos[self.arm_qadr] = np.asarray(q_init, float)
+              iters: int = 150, pos_tol: float = 2e-3, rot_tol: float = 2e-2,
+              damping: float = 5e-2, step: float = 0.5, n_restarts: int = 6):
+        """Multi-restart DLS IK. Tries the given seed, the joint-mid pose, then
+        random seeds, and keeps the best — robust to local minima (e.g. the
+        tool-up -> tool-down flip that stalls a single-seed solve)."""
+        saved = self.data.qpos.copy()
+        savedv = self.data.qvel.copy()
         target_pos = np.asarray(target_pos, float)
         target_mat = np.asarray(target_mat, float).reshape(3, 3)
 
+        rng = np.random.default_rng(0)
+        seeds = []
+        if q_init is not None:
+            seeds.append(np.asarray(q_init, float))
+        seeds.append(0.5 * (self.low + self.high))
+        for _ in range(n_restarts):
+            seeds.append(rng.uniform(self.low, self.high))
+
+        best_sol, best_err, best_ok = None, np.inf, False
+        for seed in seeds:
+            sol, ok, err = self._solve_once(target_pos, target_mat, seed,
+                                            iters, pos_tol, rot_tol, damping, step)
+            if err < best_err:
+                best_sol, best_err, best_ok = sol, err, ok
+            if ok:
+                break
+
+        self.data.qpos[:] = saved          # restore live sim
+        self.data.qvel[:] = savedv
+        self.mj.mj_forward(self.model, self.data)
+        return best_sol, best_ok, best_err
+
+    def _solve_once(self, target_pos, target_mat, seed,
+                    iters, pos_tol, rot_tol, damping, step):
+        mj, model, data = self.mj, self.model, self.data
+        data.qpos[self.arm_qadr] = np.clip(seed, self.low, self.high)
         jacp = np.zeros((3, model.nv))
         jacr = np.zeros((3, model.nv))
-        ok = False
-        err_norm = np.inf
+        ok, err_norm = False, np.inf
         for _ in range(iters):
             mj.mj_forward(model, data)
             cur_pos = data.site_xpos[self.sid]
             cur_mat = data.site_xmat[self.sid].reshape(3, 3)
-
             e_pos = target_pos - cur_pos
-            # orientation error as a world-frame rotation vector (axis*angle).
-            # Via R_err = R_tgt @ R_cur^T -> rotvec; correct even for ~180° flips
-            # (the cross-product form is degenerate there and stalls the solver).
             e_rot = _Rot.from_matrix(target_mat @ cur_mat.T).as_rotvec()
             err = np.concatenate([e_pos, e_rot])
             err_norm = float(np.linalg.norm(err))
             if np.linalg.norm(e_pos) < pos_tol and np.linalg.norm(e_rot) < rot_tol:
                 ok = True
                 break
-
             mj.mj_jacSite(model, data, jacp, jacr, self.sid)
-            J = np.vstack([jacp[:, self.arm_dofs], jacr[:, self.arm_dofs]])  # 6x6
-            # dq = J^T (J J^T + λ²I)^-1 err
-            lam2 = damping ** 2
-            dq = J.T @ np.linalg.solve(J @ J.T + lam2 * np.eye(6), err)
+            J = np.vstack([jacp[:, self.arm_dofs], jacr[:, self.arm_dofs]])
+            dq = J.T @ np.linalg.solve(J @ J.T + damping ** 2 * np.eye(6), err)
             q = data.qpos[self.arm_qadr] + step * dq
             data.qpos[self.arm_qadr] = np.clip(q, self.low, self.high)
-
-        sol = data.qpos[self.arm_qadr].copy()
-        data.qpos[:] = saved          # restore live sim
-        data.qvel[:] = savedv
-        mj.mj_forward(model, data)
-        return sol, ok, err_norm
+        return data.qpos[self.arm_qadr].copy(), ok, err_norm

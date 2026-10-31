@@ -69,8 +69,8 @@ class PiperSceneConfig:
     # reachable placements, to be randomized for training.
     add_objects: bool = True
     cubes: list = field(default_factory=lambda: [
-        CubeSpec("yellow_block", (0.32, -0.12, 0.0125), (0.95, 0.80, 0.10, 1.0)),
-        CubeSpec("black_block", (0.32, 0.02, 0.0125), (0.08, 0.08, 0.08, 1.0)),
+        CubeSpec("yellow_block", (0.28, -0.08, 0.0125), (0.95, 0.80, 0.10, 1.0)),
+        CubeSpec("black_block", (0.28, 0.06, 0.0125), (0.08, 0.08, 0.08, 1.0)),
     ])
     box: BoxSpec = field(default_factory=BoxSpec)
     # Even overhead lighting to approximate the bright indoor rig.
