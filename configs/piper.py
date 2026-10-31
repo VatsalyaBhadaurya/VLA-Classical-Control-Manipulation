@@ -106,8 +106,10 @@ class PiperConfig:
     joint_high: tuple[float, ...] = (2.618, 3.14, 0.0, 1.832, 1.22, 3.14)
 
     # Tool-center-point: a site in link6 at the grasp point (along link6 +z,
-    # between the fingers). Used by IK and grasp planning.
-    tcp_offset: tuple[float, float, float] = (0.0, 0.0, 0.17)
+    # between the finger pads). The pads sit at link7/link8 ~0.135 m from link6,
+    # so the TCP must be there — not further out, or the fingers close ABOVE
+    # the object and grip air.
+    tcp_offset: tuple[float, float, float] = (0.0, 0.0, 0.135)
 
     camera: PiperCameraConfig = field(default_factory=PiperCameraConfig)
     scene: PiperSceneConfig = field(default_factory=PiperSceneConfig)

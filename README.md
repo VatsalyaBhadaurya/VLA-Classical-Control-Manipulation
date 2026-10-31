@@ -123,6 +123,26 @@ python scripts/replay_dataset.py --episode 0 --mode kinematic --out out/replay.m
 > are plausible reachable placements (to be randomized for training), not a
 > pixel-match of any single real frame.
 
+### Classical perception → planning pick-and-place (no VLA)
+
+A perception-driven classical baseline: estimate the object's size from the
+simulated cameras, then plan and execute a grasp into the box.
+
+```bash
+# Validate dimension estimation vs ground truth (depth+segmentation)
+python scripts/estimate_object.py --camera cam_global
+
+# Perceive -> plan grasp/gripper -> IK -> trajectory -> execute -> in-box check
+python scripts/plan_pick.py --object yellow_block --out out/plan_pick.mp4
+```
+
+Pipeline: `perception/object_estimator` back-projects masked depth into a world
+point cloud → AABB dims (sub-mm accurate) + PCA yaw; `planning/grasp` sets a
+top-down grasp with gripper width from the object's short side; `control/ik`
+(multi-restart damped-least-squares on the TCP site) turns Cartesian key-poses
+into joint targets; `planning/trajectory` interpolates them; execution runs
+through the `JointSafetyFilter`. Verified: picks the cube and drops it in the box.
+
 ### SmolVLA integration (fine-tune → hybrid rollout)
 
 ```bash
