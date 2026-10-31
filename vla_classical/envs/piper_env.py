@@ -59,19 +59,21 @@ class PiperMujocoEnv:
         cam = self.cfg.camera
         sc = self.cfg.scene
 
-        # 1) wrist camera inside link6
-        wrist_cam = (
+        # 1) wrist camera + TCP site inside link6
+        wrist_extra = (
             f'<camera name="cam_gripper" mode="fixed" '
             f'pos="{_f3(cam.cam_gripper_pos)}" '
             f'xyaxes="{_fN(cam.cam_gripper_xyaxes)}" '
             f'fovy="{cam.cam_gripper_fovy}"/>'
+            f'<site name="tcp" pos="{_f3(self.cfg.tcp_offset)}" size="0.005" '
+            f'rgba="0 1 0 0.4"/>'
         )
         new_text, n = re.subn(
-            rf'(<body\s+name="{WRIST_BODY}"[^>]*>)', rf'\1\n      {wrist_cam}',
+            rf'(<body\s+name="{WRIST_BODY}"[^>]*>)', rf'\1\n      {wrist_extra}',
             text, count=1)
         if n == 0:
             print(f"[piper] WARNING: body '{WRIST_BODY}' not found; "
-                  "cam_gripper not attached. Check piper.xml body names.")
+                  "cam_gripper/tcp not attached. Check piper.xml body names.")
         text = new_text
 
         # 1b) even overhead lighting (piper.xml has no <visual>/headlight; its
@@ -127,6 +129,9 @@ class PiperMujocoEnv:
         cubes = getattr(self.cfg.scene, "cubes", [])
         primary = cubes[0].name if cubes else "object"
         self._obj_bid = mj.mj_name2id(m, mj.mjtObj.mjOBJ_BODY, primary)
+        self._cam_ids = {c: mj.mj_name2id(m, mj.mjtObj.mjOBJ_CAMERA, c)
+                         for c in ("cam_global", "cam_gripper")}
+        self._tcp_sid = mj.mj_name2id(m, mj.mjtObj.mjOBJ_SITE, "tcp")
 
     # ------------------------------------------------------------------- units
     def _grip_ds_to_ctrl(self, g: float) -> float:
@@ -218,6 +223,49 @@ class PiperMujocoEnv:
             self._renderers[(h, w)] = r
         r.update_scene(self.data, camera=camera)
         return np.ascontiguousarray(r.render().astype(np.uint8))
+
+    # ------------------------------------------------- perception / geometry
+    def geom_id(self, name: str) -> int:
+        return self.mj.mj_name2id(self.model, self.mj.mjtObj.mjOBJ_GEOM, name)
+
+    def body_pose(self, name: str):
+        bid = self.mj.mj_name2id(self.model, self.mj.mjtObj.mjOBJ_BODY, name)
+        return self.data.xpos[bid].copy(), self.data.xquat[bid].copy()
+
+    def tcp_pose(self):
+        """World (pos, 3x3 rot) of the TCP site between the fingers."""
+        return (self.data.site_xpos[self._tcp_sid].copy(),
+                self.data.site_xmat[self._tcp_sid].reshape(3, 3).copy())
+
+    def percep_render(self, camera: str, h: int, w: int, mode: str = "rgb"):
+        """Render rgb/depth/seg from a camera (dedicated renderer per size)."""
+        key = ("percep", h, w)
+        r = self._renderers.get(key)
+        if r is None:
+            r = self.mj.Renderer(self.model, height=h, width=w)
+            self._renderers[key] = r
+        if mode == "depth":
+            r.enable_depth_rendering()
+        elif mode == "seg":
+            r.enable_segmentation_rendering()
+        r.update_scene(self.data, camera=camera)
+        out = r.render()
+        if mode == "depth":
+            r.disable_depth_rendering()
+        elif mode == "seg":
+            r.disable_segmentation_rendering()
+        return out
+
+    def camera_params(self, camera: str, h: int, w: int):
+        """Pinhole intrinsics (f, cx, cy) + extrinsics (cam_xpos, cam_xmat)."""
+        import math
+        cid = self._cam_ids[camera]
+        fovy = float(self.model.cam_fovy[cid])          # vertical FOV, degrees
+        f = 0.5 * h / math.tan(math.radians(fovy) * 0.5)
+        cx, cy = (w - 1) * 0.5, (h - 1) * 0.5
+        xpos = self.data.cam_xpos[cid].copy()
+        xmat = self.data.cam_xmat[cid].reshape(3, 3).copy()
+        return f, cx, cy, xpos, xmat
 
     def close(self):
         for r in self._renderers.values():
