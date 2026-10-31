@@ -12,7 +12,7 @@ import numpy as np
 
 def build_pick_place_trajectory(ik, grasp, q_start,
                                 n_move: int = 40, n_descend: int = 25,
-                                n_dwell: int = 15):
+                                n_dwell: int = 25):
     M = grasp.grasp_mat
     q_start = np.asarray(q_start, float)[:6]
 

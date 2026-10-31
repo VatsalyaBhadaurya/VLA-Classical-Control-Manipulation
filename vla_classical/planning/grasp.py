@@ -42,9 +42,8 @@ class GraspPlan:
     note: str = ""
 
 
-def plan_grasp(est, box_center, cfg, hover: float = 0.12,
-               clearance: float = 0.015, squeeze: float = 0.004,
-               elongated_ratio: float = 1.3) -> GraspPlan:
+def plan_grasp(est, box_center, cfg, hover: float = 0.08,
+               clearance: float = 0.05, elongated_ratio: float = 1.3) -> GraspPlan:
     gmax = float(cfg.gripper_dataset_max)
     sx, sy = float(est.dims[0]), float(est.dims[1])
     short = min(sx, sy)
@@ -57,8 +56,10 @@ def plan_grasp(est, box_center, cfg, hover: float = 0.12,
     else:
         yaw = 0.0
 
+    # Open wide enough to clear the object on descent; close FULLY so the
+    # position actuator presses on the object (force closure via friction).
     gripper_open = float(np.clip(short + clearance, 0.0, gmax))
-    gripper_close = float(np.clip(short - squeeze, 0.0, gmax))
+    gripper_close = 0.0
     graspable = short <= gmax
     note = "" if graspable else f"short side {short:.3f} > gripper max {gmax:.3f}"
 
