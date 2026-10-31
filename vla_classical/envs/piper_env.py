@@ -76,12 +76,16 @@ class PiperMujocoEnv:
                   "cam_gripper/tcp not attached. Check piper.xml body names.")
         text = new_text
 
-        # 1b) even overhead lighting (piper.xml has no <visual>/headlight; its
-        #     only light tracks the gripper, leaving the table dark).
-        headlight = (
-            f'<visual><headlight ambient="{_fN(sc.headlight_ambient)}" '
+        # 1b) even overhead lighting + a large-enough offscreen framebuffer
+        #     (default is 640x480; cam_global is 1280x720). piper.xml has no
+        #     <visual>, so we add one; its only light tracks the gripper.
+        offw = max(cam.cam_global_hw[1], cam.cam_gripper_hw[1])
+        offh = max(cam.cam_global_hw[0], cam.cam_gripper_hw[0])
+        visual = (
+            f'<visual><global offwidth="{offw}" offheight="{offh}"/>'
+            f'<headlight ambient="{_fN(sc.headlight_ambient)}" '
             f'diffuse="{_fN(sc.headlight_diffuse)}" specular="0 0 0"/></visual>')
-        text = text.replace("<worldbody>", f"{headlight}\n  <worldbody>", 1)
+        text = text.replace("<worldbody>", f"{visual}\n  <worldbody>", 1)
 
         # 2) worldbody additions: floor, global camera, task objects (box + cubes).
         g_xyaxes = _lookat_xyaxes(cam.cam_global_eye, cam.cam_global_target)
