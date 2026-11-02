@@ -26,10 +26,12 @@ def main():
     ap.add_argument("--object", default="yellow_block")
     ap.add_argument("--camera", default="cam_global")
     ap.add_argument("--downsample", type=int, default=3, help="video render scale")
+    ap.add_argument("--seed", type=int, default=-1,
+                    help=">=0 randomizes the scene (object sizes/positions + box)")
     ap.add_argument("--out", default="out/plan_pick.mp4")
     args = ap.parse_args()
 
-    from configs.piper import make_piper_config
+    from configs.piper import make_piper_config, randomize_piper_scene
     from vla_classical.envs.piper_env import PiperMujocoEnv
     from vla_classical.perception import estimate_object
     from vla_classical.control import JointSafetyFilter
@@ -38,6 +40,12 @@ def main():
 
     cfg = make_piper_config()
     cfg.camera.render_downsample = args.downsample
+    if args.seed >= 0:
+        randomize_piper_scene(cfg, args.seed)
+        print(f"[scene] seed={args.seed} "
+              + " ".join(f"{c.name}@{tuple(round(v,3) for v in c.pos)}"
+                         f"(half={c.half:.3f})" for c in cfg.scene.cubes)
+              + f" box@{tuple(round(v,3) for v in cfg.scene.box.pos)}")
     env = PiperMujocoEnv(cfg)
     env.reset()
     env.set_state(np.array(cfg.rest_state))

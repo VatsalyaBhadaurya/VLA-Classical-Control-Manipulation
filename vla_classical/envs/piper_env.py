@@ -65,8 +65,9 @@ class PiperMujocoEnv:
             f'pos="{_f3(cam.cam_gripper_pos)}" '
             f'xyaxes="{_fN(cam.cam_gripper_xyaxes)}" '
             f'fovy="{cam.cam_gripper_fovy}"/>'
+            # invisible (alpha 0) debug marker — IK uses the site pose regardless
             f'<site name="tcp" pos="{_f3(self.cfg.tcp_offset)}" size="0.005" '
-            f'rgba="0 1 0 0.4"/>'
+            f'rgba="0 1 0 0"/>'
         )
         new_text, n = re.subn(
             rf'(<body\s+name="{WRIST_BODY}"[^>]*>)', rf'\1\n      {wrist_extra}',
@@ -136,6 +137,13 @@ class PiperMujocoEnv:
         self._cam_ids = {c: mj.mj_name2id(m, mj.mjtObj.mjOBJ_CAMERA, c)
                          for c in ("cam_global", "cam_gripper")}
         self._tcp_sid = mj.mj_name2id(m, mj.mjtObj.mjOBJ_SITE, "tcp")
+        # Render option: show visual geoms (group 2) + our objects (group 0),
+        # HIDE the collision group (3) — those translucent red/blue finger pads
+        # are contact geoms, not meant to be displayed.
+        self._vopt = mj.MjvOption()
+        self._vopt.geomgroup[:] = 0
+        for g in (0, 1, 2):
+            self._vopt.geomgroup[g] = 1
 
     # ------------------------------------------------------------------- units
     def _grip_ds_to_ctrl(self, g: float) -> float:
@@ -226,7 +234,7 @@ class PiperMujocoEnv:
         if r is None:
             r = self.mj.Renderer(self.model, height=h, width=w)
             self._renderers[(h, w)] = r
-        r.update_scene(self.data, camera=camera)
+        r.update_scene(self.data, camera=camera, scene_option=self._vopt)
         return np.ascontiguousarray(r.render().astype(np.uint8))
 
     @property
@@ -258,7 +266,7 @@ class PiperMujocoEnv:
             r.enable_depth_rendering()
         elif mode == "seg":
             r.enable_segmentation_rendering()
-        r.update_scene(self.data, camera=camera)
+        r.update_scene(self.data, camera=camera, scene_option=self._vopt)
         out = r.render()
         if mode == "depth":
             r.disable_depth_rendering()

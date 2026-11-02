@@ -22,7 +22,7 @@ def build_pick_place_trajectory(ik, grasp, q_start,
     q_over, ok3, e3 = ik.solve(grasp.place_hover_pos, M, q_init=q_grasp)
     q_place, ok4, e4 = ik.solve(grasp.place_pos, M, q_init=q_over)
 
-    O, C = grasp.gripper_open, grasp.gripper_close
+    O, C, R = grasp.gripper_open, grasp.gripper_close, grasp.gripper_release
     # (target joints, gripper cmd, #steps)
     segs = [
         (q_pre, O, n_move),       # move above object, gripper open
@@ -31,7 +31,7 @@ def build_pick_place_trajectory(ik, grasp, q_start,
         (q_lift, C, n_descend),   # lift
         (q_over, C, n_move),      # traverse over the box
         (q_place, C, n_descend),  # descend into the box
-        (q_place, O, n_dwell),    # release
+        (q_place, R, n_dwell),    # release (fully open) to drop
     ]
 
     traj = []

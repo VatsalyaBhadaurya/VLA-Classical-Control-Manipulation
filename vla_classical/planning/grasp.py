@@ -36,8 +36,9 @@ class GraspPlan:
     place_hover_pos: np.ndarray
     place_pos: np.ndarray
     grasp_mat: np.ndarray
-    gripper_open: float
-    gripper_close: float
+    gripper_open: float      # clear the object on approach
+    gripper_close: float     # grip (force closure)
+    gripper_release: float   # fully open to drop
     graspable: bool
     note: str = ""
 
@@ -56,10 +57,12 @@ def plan_grasp(est, box_center, cfg, hover: float = 0.08,
     else:
         yaw = 0.0
 
-    # Open wide enough to clear the object on descent; close FULLY so the
-    # position actuator presses on the object (force closure via friction).
-    gripper_open = float(np.clip(short + clearance, 0.0, gmax))
+    # Open wide enough to clear the object on descent (with a half-open floor
+    # so approach is always safe); close FULLY so the position actuator presses
+    # on the object (force closure via friction); release fully to drop.
+    gripper_open = float(np.clip(max(short + clearance, 0.5 * gmax), 0.0, gmax))
     gripper_close = 0.0
+    gripper_release = gmax
     graspable = short <= gmax
     note = "" if graspable else f"short side {short:.3f} > gripper max {gmax:.3f}"
 
@@ -78,4 +81,4 @@ def plan_grasp(est, box_center, cfg, hover: float = 0.08,
         place_hover_pos=place_hover_pos, place_pos=place_pos,
         grasp_mat=top_down_mat(yaw),
         gripper_open=gripper_open, gripper_close=gripper_close,
-        graspable=graspable, note=note)
+        gripper_release=gripper_release, graspable=graspable, note=note)

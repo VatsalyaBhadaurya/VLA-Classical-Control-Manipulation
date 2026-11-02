@@ -134,3 +134,23 @@ class PiperConfig:
 
 def make_piper_config() -> PiperConfig:
     return PiperConfig()
+
+
+def randomize_piper_scene(cfg: PiperConfig, seed: int) -> PiperConfig:
+    """Randomize object sizes/positions + box location within the reachable
+    workspace, in place. Cubes stay graspable and on the table; the box is
+    placed to the +y side. Returns cfg for chaining."""
+    import numpy as np
+    rng = np.random.default_rng(seed)
+    # two cubes on the -y / +y sides so they don't overlap
+    y_ranges = [(-0.14, -0.02), (0.02, 0.12)]
+    for cube, (ylo, yhi) in zip(cfg.scene.cubes, y_ranges):
+        half = float(rng.uniform(0.011, 0.015))
+        x = float(rng.uniform(0.25, 0.30))
+        y = float(rng.uniform(ylo, yhi))
+        cube.half = half
+        cube.pos = (x, y, half)            # rest on the table
+    bx = float(rng.uniform(0.26, 0.30))
+    by = float(rng.uniform(0.16, 0.24))
+    cfg.scene.box.pos = (bx, by, 0.0)
+    return cfg
