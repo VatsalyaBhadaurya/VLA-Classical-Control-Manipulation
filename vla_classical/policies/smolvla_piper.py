@@ -30,6 +30,7 @@ class SmolVLAJointPolicy:
 
         self.torch = torch
         self.instruction = cfg.instruction
+        self.cam_map = dict(cfg.vla_camera_map)
         ckpt = cfg.vla_ckpt
 
         self.device = (cfg.vla_device
@@ -57,11 +58,12 @@ class SmolVLAJointPolicy:
             "task": self.instruction,
         }
         for name, im in obs.images.items():               # cam_global, cam_gripper
+            key = self.cam_map.get(name, name)             # -> camera1 / camera2 (training names)
             t = torch.from_numpy(np.ascontiguousarray(im)).permute(2, 0, 1)
             t = t.float().div_(255.0)[None].to(self.device)
             if self._half:
                 t = t.half()
-            batch[f"observation.images.{name}"] = t
+            batch[f"observation.images.{key}"] = t
 
         with torch.no_grad():
             batch = self.pre(batch)

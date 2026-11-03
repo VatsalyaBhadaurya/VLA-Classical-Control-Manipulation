@@ -120,6 +120,10 @@ class PiperConfig:
     vla_ckpt: str = "outputs/train/piper_smolvla/checkpoints/last/pretrained_model"
     vla_device: str = "cuda"           # "cpu" fallback if VRAM insufficient
     vla_half: bool = False             # fp16 weights to save VRAM (try if OOM)
+    # Map env camera names -> the feature names the policy was TRAINED with.
+    # We fine-tuned with --rename_map cam_global->camera1, cam_gripper->camera2.
+    vla_camera_map: dict = field(default_factory=lambda: {
+        "cam_global": "camera1", "cam_gripper": "camera2"})
 
     # Real resting configuration (from dataset episode 0, row 0) — use instead
     # of the Menagerie "home" keyframe so the sim starts like the real robot.
