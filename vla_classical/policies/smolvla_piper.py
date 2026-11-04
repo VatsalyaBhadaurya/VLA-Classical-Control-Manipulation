@@ -26,7 +26,8 @@ class SmolVLAJointPolicy:
     def __init__(self, cfg: PiperConfig):
         import torch
         from lerobot.configs import PreTrainedConfig
-        from lerobot.policies import make_policy, make_pre_post_processors
+        from lerobot.policies import make_pre_post_processors
+        from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
 
         self.torch = torch
         self.instruction = cfg.instruction
@@ -38,7 +39,10 @@ class SmolVLAJointPolicy:
                        else "cpu")
 
         pcfg = PreTrainedConfig.from_pretrained(ckpt)
-        self.policy = make_policy(pcfg, pretrained_path=ckpt)
+        # Load the fine-tuned checkpoint directly (features are baked into the
+        # saved config). make_policy would demand dataset-metadata/env to infer
+        # features, which isn't the right tool for a finished checkpoint.
+        self.policy = SmolVLAPolicy.from_pretrained(ckpt)
         self.pre, self.post = make_pre_post_processors(pcfg, pretrained_path=ckpt)
         self.policy.to(self.device)
         if cfg.vla_half and self.device != "cpu":
