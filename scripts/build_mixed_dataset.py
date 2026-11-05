@@ -59,14 +59,27 @@ def _task_of(item, meta):
         return str(ti)
 
 
+def _episode_ranges(src):
+    """(start, stop) row ranges per episode, across lerobot versions."""
+    idx = getattr(src, "episode_data_index", None)
+    if idx is not None and "from" in idx:
+        return [(int(idx["from"][e]), int(idx["to"][e]))
+                for e in range(src.num_episodes)]
+    ep = np.asarray(src.hf_dataset["episode_index"]).astype(np.int64).ravel()
+    changes = np.where(np.diff(ep) != 0)[0] + 1
+    starts = np.concatenate([[0], changes])
+    stops = np.concatenate([changes, [len(ep)]])
+    return list(zip(starts.tolist(), stops.tolist()))
+
+
 def _copy(src, out, shapes, meta, repeat, limit_eps, desc):
     from tqdm import tqdm
     (gh, gw), (wh, ww) = shapes
-    n = src.num_episodes if limit_eps is None else min(limit_eps, src.num_episodes)
-    idx = src.episode_data_index
+    ranges = _episode_ranges(src)
+    if limit_eps is not None:
+        ranges = ranges[:limit_eps]
     for r in range(repeat):
-        for ep in tqdm(range(n), desc=f"{desc}{'' if repeat == 1 else f' x{r+1}'}"):
-            start, stop = int(idx["from"][ep]), int(idx["to"][ep])
+        for (start, stop) in tqdm(ranges, desc=f"{desc}{'' if repeat == 1 else f' x{r+1}'}"):
             for i in range(start, stop):
                 it = src[i]
                 _add(out, {
