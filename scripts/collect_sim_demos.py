@@ -100,7 +100,7 @@ def main():
         try:
             env.reset()
             obs = env.set_state(np.array(cfg.rest_state))
-            est = estimate_object(env, args.object, camera="cam_global", res=(256, 256))
+            est = estimate_object(env, args.object, camera="cam_global", res=(360, 640))
             box_center, _ = env.body_pose("bin")
             grasp = plan_grasp(est, box_center, cfg)
             if not grasp.graspable:
