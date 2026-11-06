@@ -27,10 +27,12 @@ def main():
     ap.add_argument("--steps", type=int, default=300)
     ap.add_argument("--downsample", type=int, default=2)
     ap.add_argument("--no-safety", action="store_true", help="VLA-only (no filter)")
+    ap.add_argument("--seed", type=int, default=-1,
+                    help=">=0 randomizes the scene (cube/box placement)")
     ap.add_argument("--out", default="out/piper_vla.mp4")
     args = ap.parse_args()
 
-    from configs.piper import make_piper_config
+    from configs.piper import make_piper_config, randomize_piper_scene
     from vla_classical.envs.piper_env import PiperMujocoEnv
     from vla_classical.control import JointSafetyFilter
     from vla_classical.policies.smolvla_piper import SmolVLAJointPolicy
@@ -41,6 +43,12 @@ def main():
         cfg.vla_ckpt = args.ckpt
     if args.no_safety:
         cfg.safety.enabled = False
+    if args.seed >= 0:
+        randomize_piper_scene(cfg, args.seed)
+        print(f"[scene] seed={args.seed} "
+              + " ".join(f"{c.name}@{tuple(round(v, 3) for v in c.pos)}"
+                         for c in cfg.scene.cubes)
+              + f" box@{tuple(round(v, 3) for v in cfg.scene.box.pos)}")
 
     print(f"[cfg] ckpt={cfg.vla_ckpt} device={cfg.vla_device} "
           f"safety={cfg.safety.enabled} instruction={cfg.instruction!r}")
